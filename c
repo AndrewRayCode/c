@@ -3,40 +3,46 @@
 # ---------------------------------
 # Color codes for friendly messages
 # ---------------------------------
-COLOR_RED=$(tput sgr0 && tput setaf 1)
-COLOR_GREEN=$(tput sgr0 && tput setaf 2)
-COLOR_YELLOW=$(tput sgr0 && tput setaf 3)
-COLOR_DARK_BLUE=$(tput sgr0 && tput setaf 4)
-COLOR_BLUE=$(tput sgr0 && tput setaf 6)
-COLOR_PURPLE=$(tput sgr0 && tput setaf 5)
-COLOR_PINK=$(tput sgr0 && tput bold && tput setaf 5)
-COLOR_LIGHT_GREEN=$(tput sgr0 && tput bold && tput setaf 2)
-COLOR_LIGHT_RED=$(tput sgr0 && tput bold && tput setaf 1)
-COLOR_LIGHT_CYAN=$(tput sgr0 && tput bold && tput setaf 6)
-COLOR_RESET=$(tput sgr0)
+_COLOR_RED=$(tput sgr0 && tput setaf 1)
+_COLOR_GREEN=$(tput sgr0 && tput setaf 2)
+_COLOR_YELLOW=$(tput sgr0 && tput setaf 3)
+_COLOR_DARK_BLUE=$(tput sgr0 && tput setaf 4)
+_COLOR_BLUE=$(tput sgr0 && tput setaf 6)
+_COLOR_PURPLE=$(tput sgr0 && tput setaf 5)
+_COLOR_PINK=$(tput sgr0 && tput bold && tput setaf 5)
+_COLOR_LIGHT_GREEN=$(tput sgr0 && tput bold && tput setaf 2)
+_COLOR_LIGHT_RED=$(tput sgr0 && tput bold && tput setaf 1)
+_COLOR_LIGHT_CYAN=$(tput sgr0 && tput bold && tput setaf 6)
+_COLOR_RESET=$(tput sgr0)
 
 # ---------------
 # Setup variables
 # ---------------
 
-OLDIFS=$IFS
+_OLDIFS=$IFS
 IFS=$'\n'
+
+_ERROR_SYMBOL="🚩"
+_SNOOZE_SYMBOL="😴"
+_GUITAR_SYMBOL="😴"
 
 # ---------
 # Functions
 # ---------
 
+# Make sure we're in a git repository and error if not
 function _git_sanity_check() {
     local gitTest=`git rev-parse --git-dir 2> /dev/null;`
     if [[ -z "$gitTest" ]]; then
-        echo "${COLOR_LIGHT_RED}'c' is a utiltiy command for working with Git recent branches.${COLOR_RESET}"
-        echo -e "\n${COLOR_LIGHT_RED}It must be run in a git repository. No git repository detected here!${COLOR_RESET}"
+        echo "${_COLOR_LIGHT_RED}'c' is a utiltiy command for working with Git recent branches.${_COLOR_RESET}"
+        echo -e "\n${_COLOR_LIGHT_RED}${_ERROR_SYMBOL}It must be run in a git repository. No git repository detected here!${_COLOR_RESET}"
         exit 1
     fi
 }
 
+# Find the longest branch name and return the string length of it
 function _longest_branch_name() {
-    local branchList=$1
+    local branchList="$1"
 
     local longestBranchLength=0
 
@@ -52,22 +58,7 @@ function _longest_branch_name() {
     echo $longestBranchLength
 }
 
-# Calculate how many characters to pad including color code length...
-function _get_pad_length_with_colors() {
-    # When padding the output with printf, we need to take into account the
-    # length of the branch name, plus any color codes we use, which aren't
-    # printed, but are counted in printf's %-10s padding. We need to add in
-    # the estimated string length of the color escape codes (including
-    # color reset) to pad the branch name correctly
-    local colorLength=4
-    local numberOfColors=8
-    local longestBranchLength=$1
-
-    let local padLength="( longestBranchLength + 2 ) + ( colorLength  * numberOfColors )"
-
-    echo $padLength
-}
-
+# Get the names of the top n branches
 function _top_n_branches() {
     git for-each-ref --sort=-committerdate refs/heads/ | head -n 10
 }
@@ -84,35 +75,40 @@ function _c_git_recent_branches() {
     # wc -l produces a number with whitespace before it. Remove it
     local numberOfBranches=${wcLineCount// }
 
-    local longestBranchLength=$(_longest_branch_name $branchList)
+    local longestBranchLength=$(_longest_branch_name "$branchList")
 
-    local padLength=$(_get_pad_length_with_colors $longestBranchLength)
+    let local padLength="longestBranchLength + 1"
+
+    local currentGitBranch=$(git branch | sed -n '/\* /s///p')
 
     # Bash syntax for declaring array
     declare -a branches
 
-    # Show branches in a list with a counter
+    # Show colorful branches in a list with a counter and last commit
     local counter=0
     while read -r branch;
     do
-        counter=`expr $counter + 1`
-        branches=("${branches[@]}" "$branch")
-        branchName=`echo "$branch" | sed 's/.*refs\/heads\///'`
-        branchNamePrefix="$COLOR_PURPLE$counter. $COLOR_PINK $branchName"
-        resetColor="$counter. $branchName"
-        # this interpolates to something like `printf %-100s` which is
-        # syntax for padding in printf
-        printf "%-${padLength}s" $branchNamePrefix
-        printf '%s \n' `git show --quiet $branchName --pretty=format:"%C(Yellow)%h %Cred<%an>%Creset %s %C(cyan)(%cr)%Creset"`
+        local counter=`expr $counter + 1`
+        local branches=("${branches[@]}" "$branch")
+        local branchName=`echo "$branch" | sed 's/.*refs\/heads\///'`
+        local branchNamePrefix="${_COLOR_PURPLE}${counter}. ${_COLOR_PINK} ${branchName}${_COLOR_RESET}"
+        local lastCommitFormatted=`git show --quiet $branchName --pretty=format:"%C(Yellow)%h %Cred<%an>%Creset %s %C(cyan)(%cr)%Creset"`
+
+        # this interpolates to something like `printf %-100s` which is syntax
+        # for padding in printf
+        printf "${_COLOR_PURPLE}%-2s ${_COLOR_PINK}%-${padLength}s" "${counter}." $branchName
+        printf '%s \n' $lastCommitFormatted
     done <<< "$branchList"
 
+    # If there's only 2 options, show "1 or 2". Otherwise show "1 - n"
     if [[ $counter == "2" ]]; then
         local separator="or"
     else
         local separator="-"
     fi
+
     # Prompt user for file. -n means no line break after echo
-    echo -n "${COLOR_YELLOW}(1 $separator $counter)?${COLOR_RESET} "
+    echo -n "${_COLOR_YELLOW}1 $separator $counter?${_COLOR_RESET} "
     read userInputBranchNumber
 
     # Remove any whitespace
@@ -122,26 +118,24 @@ function _c_git_recent_branches() {
 
     # Nothing entered?
     if [[ -z "$branchNumber" ]]; then
-        echo "${COLOR_LIGHT_RED}Nothing to do (no branch specified).${COLOR_RESET}"
+        echo "${_COLOR_LIGHT_RED}${_SNOOZE_SYMBOL}  Nothing to do (no branch specified).${_COLOR_RESET}"
         exit 1
     fi
 
     # Not numeric?
     if ! [[ "$branchNumber" =~ ^[0-9]+$ ]]; then
-        echo "${COLOR_LIGHT_RED}Please enter a numeric value between 1 and ${numberOfBranches}.${COLOR_RESET}"
+        echo "${_COLOR_LIGHT_RED}${_ERROR_SYMBOL}  Please enter a numeric value between 1 and ${numberOfBranches}.${_COLOR_RESET}"
         exit 1
     fi
 
-    # Bash arrays are 0 indexed
+    # Bash arrays are 0 indexed, so subtract one from user input (notice MINUS)
     let "branchNumber+=-1"
 
     if [[ "$branchNumber" -ge "$numberOfBranches" ]]; then
-        if [[ $numberOfBranches == "1" ]]; then
-            echo "${COLOR_LIGHT_RED}Really?${COLOR_RESET}"
-        elif [[ "$branchNumber" == "10" ]]; then
-            echo "${COLOR_LIGHT_RED}This one doesn't go to eleven :(${COLOR_RESET}"
+        if [[ "$branchNumber" == "10" ]]; then
+            echo "${_COLOR_LIGHT_RED}${_GUITAR_SYMBOL}  This one doesn't go to eleven ${_COLOR_RESET}"
         else
-            echo "${COLOR_LIGHT_RED}Please enter a number from 1 to ${numberOfBranches}${COLOR_RESET}"
+            echo "${_COLOR_LIGHT_RED}${_ERROR_SYMBOL}  Please enter a number from 1 to ${numberOfBranches}${_COLOR_RESET}"
         fi
         exit 1
     fi
@@ -149,11 +143,11 @@ function _c_git_recent_branches() {
     local newBranch=`echo "${branches[@]:$branchNumber:1}" | sed 's/.*refs\/heads\///' 2> /dev/null`
 
     if [[ -z "$newBranch" ]]; then
-        echo "${COLOR_LIGHT_RED}No git branch found named '${COLOR_CYAN}${newBranch}${COLOR_LIGHT_RED}?'${COLOR_RESET}"
+        echo "${_COLOR_LIGHT_RED}${_ERROR_SYMBOL} No git branch found named '${_COLOR_CYAN}${newBranch}${_COLOR_LIGHT_RED}?'${_COLOR_RESET}"
         exit 1
     fi
 
-    echo -e "\nPerforming \`git checkout ${newBranch}\`"
+    echo -e "\n${_COLOR_LIGHT_GREEN}Performing \`${_COLOR_LIGHT_CYAN}git checkout ${_COLOR_GREEN}${newBranch}${_COLOR_LIGHT_GREEN}\`${_COLOR_RESET}"
     git checkout $newBranch
 
 }
@@ -167,10 +161,28 @@ _c_git_recent_branches
 # --------------------------------------
 # Cleanup to not pollute shell variables
 # --------------------------------------
+
+# unset functions
 unset -f _longest_branch_name
 unset -f _c_git_recent_branches
 unset -f _top_n_branches
-unset -f _get_pad_length_with_colors
 
-IFS=$OLDIFS
+# replace magic bash separator
+IFS=$_OLDIFS
 
+# unset variables
+unset _COLOR_RED
+unset _COLOR_GREEN
+unset _COLOR_YELLOW
+unset _COLOR_DARK_BLUE
+unset _COLOR_BLUE
+unset _COLOR_PURPLE
+unset _COLOR_PINK
+unset _COLOR_LIGHT_GREEN
+unset _COLOR_LIGHT_RED
+unset _COLOR_LIGHT_CYAN
+unset _COLOR_RESET
+
+unset _ERROR_SYMBOL
+unset _SNOOZE_SYMBOL
+unset _GUITAR_SYMBOL
