@@ -26,6 +26,15 @@ IFS=$'\n'
 # Functions
 # ---------
 
+function _git_sanity_check() {
+    local gitTest=`git rev-parse --git-dir 2> /dev/null;`
+    if [[ -z "$gitTest" ]]; then
+        echo "${COLOR_LIGHT_RED}'c' is a utiltiy command for working with Git recent branches.${COLOR_RESET}"
+        echo -e "\n${COLOR_LIGHT_RED}It must be run in a git repository. No git repository detected here!${COLOR_RESET}"
+        exit 1
+    fi
+}
+
 function _longest_branch_name() {
     local branchList=$1
 
@@ -65,13 +74,17 @@ function _top_n_branches() {
 
 function _c_git_recent_branches() {
 
-    local branchOutput=$(_top_n_branches)
-    local wcLineCount=`echo $branchOutput | wc -l`
+    _git_sanity_check
+
+    local branchList=$(_top_n_branches)
+
+    # Note: branchList must be quoted for linebreaks in variable to be shown
+    local wcLineCount=`echo "$branchList" | wc -l`
 
     # wc -l produces a number with whitespace before it. Remove it
     local numberOfBranches=${wcLineCount// }
 
-    local longestBranchLength=$(_longest_branch_name $branchOutput)
+    local longestBranchLength=$(_longest_branch_name $branchList)
 
     local padLength=$(_get_pad_length_with_colors $longestBranchLength)
 
@@ -91,10 +104,15 @@ function _c_git_recent_branches() {
         # syntax for padding in printf
         printf "%-${padLength}s" $branchNamePrefix
         printf '%s \n' `git show --quiet $branchName --pretty=format:"%C(Yellow)%h %Cred<%an>%Creset %s %C(cyan)(%cr)%Creset"`
-    done <<< "$branchOutput"
+    done <<< "$branchList"
 
+    if [[ $counter == "2" ]]; then
+        local separator="or"
+    else
+        local separator="-"
+    fi
     # Prompt user for file. -n means no line break after echo
-    echo -n "${COLOR_YELLOW}(1 - $numberOfBranches)?${COLOR_RESET} "
+    echo -n "${COLOR_YELLOW}(1 $separator $counter)?${COLOR_RESET} "
     read userInputBranchNumber
 
     # Remove any whitespace
@@ -117,8 +135,8 @@ function _c_git_recent_branches() {
     # Bash arrays are 0 indexed
     let "branchNumber+=-1"
 
-    if [[ "$branchNumber" -ge "$branchLength" ]]; then
-        if [[ $branchLength == "1" ]]; then
+    if [[ "$branchNumber" -ge "$numberOfBranches" ]]; then
+        if [[ $numberOfBranches == "1" ]]; then
             echo "${COLOR_LIGHT_RED}Really?${COLOR_RESET}"
         elif [[ "$branchNumber" == "10" ]]; then
             echo "${COLOR_LIGHT_RED}This one doesn't go to eleven :(${COLOR_RESET}"
@@ -149,10 +167,10 @@ _c_git_recent_branches
 # --------------------------------------
 # Cleanup to not pollute shell variables
 # --------------------------------------
-unset _longest_branch_name
-unset _c_git_recent_branches
-unset _top_n_branches
-unset _get_pad_length_with_colors
+unset -f _longest_branch_name
+unset -f _c_git_recent_branches
+unset -f _top_n_branches
+unset -f _get_pad_length_with_colors
 
 IFS=$OLDIFS
 
