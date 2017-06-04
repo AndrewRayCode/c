@@ -147,6 +147,3 @@ function c() {
 
 }
 
-# Wire up autocomplete
-complete -F _c  c
-
