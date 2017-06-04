@@ -153,7 +153,7 @@ function _c_git_recent_branches() {
         exit 1
     fi
 
-    echo -e "\ngit checkout $newBranch"
+    echo -e "\nPerforming \`git checkout ${newBranch}\`"
     git checkout $newBranch
 
 }
