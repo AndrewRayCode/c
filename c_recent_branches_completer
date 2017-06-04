@@ -1,0 +1,38 @@
+#!/bin/bash
+
+cur=${COMP_WORDS[COMP_CWORD]}
+branches=`git for-each-ref --sort=-committerdate refs/heads/ | head -n 10`
+
+# By default bash breaks on "words", not lines. Set this magical garbage
+# so autocomplete works with line breaks, not one big string
+OLDIFS=$IFS
+IFS=$'\n'
+
+output=''
+while read -r branch;
+do
+    output+=`echo $branch | sed 's/.*refs\/heads\///'`
+    rawBranchName=`git show --quiet $(echo $branch | cut -d' ' -f1) --pretty=format:"%h <%an> %s (%cr)\'"`
+    # If a commit message has backticks or dollar signs in it, bash will
+    # try to interpolate it when outputting. Escape backtick and dollar
+    # sign to prevent that
+    sanitizedbranchName=`echo $rawBranchName | sed 's/\([$\`]\)/\\\1/g'`
+    output+="'"
+    output+=$sanitizedBranchname
+    output+="'"$'\n'
+done <<< "$branches"
+
+# Why do I lowercase the output?
+response=''
+for branch in $output
+do
+    lowerBranch=`echo $branch | tr '[:upper:]' '[:lower:]'`
+    if [[ $branch =~ .*$cur.* ]]; then
+        response+=$branch$'\n'
+    fi
+done
+
+COMPREPLY=( $( compgen -W "$response" -- $cur ) )
+
+IFS=$OLDIFS
+
