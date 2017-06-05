@@ -3,6 +3,7 @@
 # ---------------------------------
 # Color codes for friendly messages
 # ---------------------------------
+_COLOR_BOLD=$(tput sgr0 && tput bold)
 _COLOR_RED=$(tput sgr0 && tput setaf 1)
 _COLOR_GREEN=$(tput sgr0 && tput setaf 2)
 _COLOR_YELLOW=$(tput sgr0 && tput setaf 3)
@@ -29,6 +30,33 @@ _GUITAR_SYMBOL="😴"
 # ---------
 # Functions
 # ---------
+
+# Print help message that I went overboard on (I sure hope c is a free name!)
+function _print_help() {
+    echo -e "${_COLOR_PURPLE}  /${_COLOR_PINK}\\ __/\\"
+    echo -e "${_COLOR_PURPLE} / /___\\/"
+    echo -e "/ / /"
+    echo -e "\\ ${_COLOR_PINK}\\ \\__   ${_COLOR_RESET}'c' is a shell script for quickly viewing and switching between recent Git branches."
+    echo -e "${_COLOR_PURPLE} \\ ${_COLOR_PINK}\\ __/\\"
+    echo -e "${_COLOR_PURPLE}  \\/___\\/${_COLOR_RESET}"
+    echo -e "\n${_COLOR_PINK}Use${_COLOR_RESET}"
+    echo -e "    The most common usage is to run c without arguments. Then you're presented with a list of recent branches."
+    echo -e "    Entering the number corresponding with the listed branch performs 'git checkout branch'"
+    echo -e "\n    c also supports tab completion of branch names. See the ${_COLOR_PINK}Tab Completion${_COLOR_RESET} section for more."
+    echo -e "\n${_COLOR_PINK}Command Line Options${_COLOR_RESET}"
+    echo -e "    c ${_COLOR_BOLD}branchname${_COLOR_RESET}"
+    echo -e "        Peforms 'git checkout branchname'"
+    echo -e "\n    c ${_COLOR_BOLD}-h${_COLOR_RESET}"
+    echo -e "    c ${_COLOR_BOLD}--help${_COLOR_RESET}"
+    echo -e "        Print this help message"
+    echo -e "\n${_COLOR_PINK}Tab Completion${_COLOR_RESET}"
+    echo -e "    A useful feature of c is typing c<space><tab><tab> to automatically list all recent branches and their"
+    echo -e "    corresponding commits. To set up this command line completion, add the following to your .bashwhatever:"
+    echo -e "\n        # Set up tab completion for git completion 'c' utility script"
+    echo -e "        if [[ -d \"\$(brew --prefix c)\" ]]; then"
+    echo -e "            source \"\$(brew --prefix c)/c_recent_branches_completer\""
+    echo -e "        fi"
+}
 
 # Make sure we're in a git repository and error if not
 function _git_sanity_check() {
@@ -63,6 +91,13 @@ function _top_n_branches() {
     git for-each-ref --sort=-committerdate refs/heads/ | head -n 10
 }
 
+function _perform_checkout() {
+    local newBranch=$1
+    echo -e "\n${_COLOR_LIGHT_GREEN}Performing \`${_COLOR_LIGHT_CYAN}git checkout ${_COLOR_GREEN}${newBranch}${_COLOR_LIGHT_GREEN}\`${_COLOR_RESET}"
+    git checkout $newBranch
+}
+
+# Do the heavy lifting of this command
 function _c_git_recent_branches() {
 
     _git_sanity_check
@@ -81,10 +116,13 @@ function _c_git_recent_branches() {
 
     local currentGitBranch=$(git branch | sed -n '/\* /s///p')
 
+    local firstGitBranch=`echo "$branchList" | head -n1 | sed 's/.*refs\/heads\///'`
+
     # Bash syntax for declaring array
     declare -a branches
 
     # Show colorful branches in a list with a counter and last commit
+    echo "${_COLOR_LIGHT_CYAN}Recent branches:${_COLOR_RESET}"
     local counter=0
     while read -r branch;
     do
@@ -96,9 +134,14 @@ function _c_git_recent_branches() {
 
         # this interpolates to something like `printf %-100s` which is syntax
         # for padding in printf
-        printf "${_COLOR_PURPLE}%-2s ${_COLOR_PINK}%-${padLength}s" "${counter}." $branchName
+        printf " ${_COLOR_PURPLE}%-2s ${_COLOR_PINK}%-${padLength}s" "${counter}." $branchName
         printf '%s \n' $lastCommitFormatted
     done <<< "$branchList"
+
+    if [[ "$counter" == "1" && "$currentGitBranch" == "$firstGitBranch" ]]; then
+        echo -e "\n${_COLOR_LIGHT_GREEN}There's only one branch in this repository, and you're on it!${_COLOR_RESET}"
+        exit 0
+    fi
 
     # If there's only 2 options, show "1 or 2". Otherwise show "1 - n"
     if [[ $counter == "2" ]]; then
@@ -147,8 +190,7 @@ function _c_git_recent_branches() {
         exit 1
     fi
 
-    echo -e "\n${_COLOR_LIGHT_GREEN}Performing \`${_COLOR_LIGHT_CYAN}git checkout ${_COLOR_GREEN}${newBranch}${_COLOR_LIGHT_GREEN}\`${_COLOR_RESET}"
-    git checkout $newBranch
+    _perform_checkout $newBranch
 
 }
 
@@ -156,7 +198,18 @@ function _c_git_recent_branches() {
 # Main script execution
 # ---------------------
 
-_c_git_recent_branches
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    _print_help
+    exit 0
+fi
+
+# If nothing was provided to the script, list the recent branches
+if [[ -z "$1" ]]; then
+    _c_git_recent_branches
+# This command can also change to a branch if specified
+else
+    _perform_checkout $1
+fi
 
 # --------------------------------------
 # Cleanup to not pollute shell variables
@@ -166,6 +219,7 @@ _c_git_recent_branches
 unset -f _longest_branch_name
 unset -f _c_git_recent_branches
 unset -f _top_n_branches
+unset -f _print_help
 
 # replace magic bash separator
 IFS=$_OLDIFS
