@@ -25,7 +25,7 @@ IFS=$'\n'
 
 _ERROR_SYMBOL="🚩"
 _SNOOZE_SYMBOL="😴"
-_GUITAR_SYMBOL="😴"
+_GUITAR_SYMBOL="🎸"
 
 # ---------
 # Functions
@@ -62,8 +62,8 @@ function _print_help() {
 function _git_sanity_check() {
     local gitTest=`git rev-parse --git-dir 2> /dev/null;`
     if [[ -z "$gitTest" ]]; then
-        echo "${_COLOR_LIGHT_RED}'c' is a utiltiy command for working with Git recent branches.${_COLOR_RESET}"
-        echo -e "\n${_COLOR_LIGHT_RED}${_ERROR_SYMBOL}It must be run in a git repository. No git repository detected here!${_COLOR_RESET}"
+        echo "${_COLOR_LIGHT_RED}'c' is a utiltiy command for working with Git recent branches. See c --help for more.${_COLOR_RESET}"
+        echo -e "\n${_COLOR_LIGHT_RED}${_ERROR_SYMBOL}  It must be run in a git repository. No git repository detected here!${_COLOR_RESET}"
         exit 1
     fi
 }
@@ -186,7 +186,7 @@ function _c_git_recent_branches() {
     local newBranch=`echo "${branches[@]:$branchNumber:1}" | sed 's/.*refs\/heads\///' 2> /dev/null`
 
     if [[ -z "$newBranch" ]]; then
-        echo "${_COLOR_LIGHT_RED}${_ERROR_SYMBOL} No git branch found named '${_COLOR_CYAN}${newBranch}${_COLOR_LIGHT_RED}?'${_COLOR_RESET}"
+        echo "${_COLOR_LIGHT_RED}${_ERROR_SYMBOL}  No git branch found named '${_COLOR_CYAN}${newBranch}${_COLOR_LIGHT_RED}?'${_COLOR_RESET}"
         exit 1
     fi
 
